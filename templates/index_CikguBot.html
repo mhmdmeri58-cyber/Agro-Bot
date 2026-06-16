@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sawit Bot - Palm Oil Helper</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap">
+    <style>
+        body { font-family: 'Open Sans', sans-serif; background-color: #f3f9f1; margin:0; padding:20px; display:flex; flex-direction:column; align-items:center;}
+        .banner { width:100%; max-width:1200px; margin-bottom:20px; text-align:center;}
+        .banner img { width:100px; border-radius:15px; box-shadow:0px 4px 15px rgba(0,0,0,0.2);}
+        .split-container { display:flex; justify-content:space-between; width:100%; max-width:1200px; gap:20px; margin-top:20px;}
+        .module-container { flex:1; background-color:#fff; border-radius:15px; box-shadow:0px 4px 15px rgba(0,0,0,0.1); padding:20px; display:flex; flex-direction:column; align-items:center; }
+        .header { text-align:center; margin-bottom:15px;}
+        .header h2 { font-size:24px; margin:0; color:#388e3c;}
+        .header p { font-size:14px; color:#555;}
+        #user-stats p { font-size:16px; margin:3px 0;}
+        .chat-box { border:2px solid #e0e0e0; border-radius:10px; padding:15px; max-height:400px; overflow-y:auto; background-color:#f9fbe7; margin-bottom:20px; flex-grow:1; width:100%; }
+        .user, .bot { display:inline-block; padding:10px 15px; border-radius:25px; margin:10px 0; max-width:70%; word-wrap:break-word; font-size:16px;}
+        .user { background-color:#b3e5fc; color:#0288d1; align-self:flex-end;}
+        .bot { background-color:#ffecb3; color:#f57f17; align-self:flex-start;}
+        .input-container { display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e0e0e0; padding-top:15px; width:100%;}
+        #user-input { flex:1; padding:10px; border:1px solid #ccc; border-radius:25px; outline:none; font-size:16px; margin-right:10px;}
+        button { background-color:#66bb6a; border:none; color:#fff; padding:10px 20px; border-radius:25px; font-size:16px; cursor:pointer; transition:0.3s;}
+        button:hover { background-color:#43a047;}
+        #quiz-container h3 { font-size:24px; color:#ff7043; margin-bottom:15px;}
+        #quiz-topic { padding:10px; border:1px solid #ccc; border-radius:25px; outline:none; font-size:16px; margin-bottom:10px; width:100%; max-width:300px;}
+        #quiz-question-container { text-align:center; margin-top:20px; background-color:#e3f2fd; padding:15px; border-radius:10px; width:100%;}
+        .choice-label { display:block; margin:10px 0; font-size:18px;}
+    </style>
+</head>
+<body>
+
+    <!-- Banner -->
+    <div class="banner">
+        <img src="{{ url_for('static', filename='icons/Cikgu_Bot.jpg') }}" alt="Sawit Bot Icon">
+    </div>
+
+    <div class="split-container">
+        <!-- Chat -->
+        <div id="chat-container" class="module-container">
+            <div class="header">
+                <h2>Sawit Bot 🌴</h2>
+                <p>Ask me anything about palm oil smallholding!</p>
+                <div id="user-stats">
+                    <p>Points: <span id="user-points">0</span></p>
+                    <p>Level: <span id="user-level">1</span></p>
+                    <p>Stickers: <span id="user-stickers">None</span></p>
+                    <p>Badges: <span id="user-badges">None</span></p>
+                </div>
+            </div>
+
+            <div class="chat-box" id="chat-box"></div>
+
+            <div class="input-container">
+                <input type="text" id="user-input" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()">Send 🚀</button>
+            </div>
+        </div>
+
+        <!-- Quiz -->
+        <div id="quiz-container" class="module-container">
+            <h3>Take a Quiz 🧠</h3>
+            <input type="text" id="quiz-topic" placeholder="Enter topic e.g., pruning">
+            <button onclick="generateQuiz()">Generate Quiz</button>
+            <div id="quiz-question-container" style="display:none;">
+                <p id="quiz-question"></p>
+                <div id="quiz-choices"></div>
+                <button id="submit-answer-button" style="display:none;" onclick="submitQuizAnswer()">Submit Answer</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+let currentCorrectAnswer = "";
+
+// List of possible badge emojis
+const badgeEmojis = ["🏆", "🥇", "🥈", "🥉", "🎖️", "🌟", "💎", "🦜", "🌴", "🍀"];
+
+// Function to update user stats
+function updateUserStats(points, stickers, badges) {
+    document.getElementById("user-points").textContent = points;
+    document.getElementById("user-stickers").textContent = stickers || "None";
+
+    // Calculate level based on number of stars (stickers)
+    let level = 1;
+    if (stickers) {
+        level = stickers.split(",").length || 1;
+    }
+    document.getElementById("user-level").textContent = level;
+
+    // Update badges display
+    document.getElementById("user-badges").textContent = badges || "None";
+}
+
+async function sendMessage() {
+    const input = document.getElementById("user-input").value;
+    if (!input) return;
+
+    const chatBox = document.getElementById("chat-box");
+    const userMsg = document.createElement("div");
+    userMsg.className = "user";
+    userMsg.textContent = input;
+    chatBox.appendChild(userMsg);
+
+    const response = await fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({message:input, username:"guest"})
+    });
+
+    const data = await response.json();
+    const botMsg = document.createElement("div");
+    botMsg.className = "bot";
+    botMsg.textContent = data.response;
+    chatBox.appendChild(botMsg);
+
+    updateUserStats(data.points, data.stickers, data.badges);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    document.getElementById("user-input").value = "";
+}
+
+async function generateQuiz() {
+    const topic = document.getElementById("quiz-topic").value;
+    if (!topic) { alert("Enter a topic"); return; }
+
+    const response = await fetch("/generate_quiz", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({topic})
+    });
+    const quiz = await response.json();
+    document.getElementById("quiz-question").innerText = quiz.question;
+
+    const container = document.getElementById("quiz-choices");
+    container.innerHTML = "";
+    const labels = ["A","B","C","D"];
+    quiz.choices.forEach((choice,index)=>{
+        const c = choice.replace(/^[A-D]\)\s*/, "").trim();
+        const div = document.createElement("div");
+        div.className = "choice-label";
+        div.innerHTML = `<input type="radio" name="quiz-choice" value="${c}"> ${labels[index]}) ${c}`;
+        container.appendChild(div);
+    });
+
+    currentCorrectAnswer = quiz.correct_answer.trim();
+    document.getElementById("quiz-question-container").style.display = "block";
+    document.getElementById("submit-answer-button").style.display = "inline-block";
+}
+
+async function submitQuizAnswer() {
+    const selected = document.querySelector('input[name="quiz-choice"]:checked');
+    if (!selected) { alert("Select an answer"); return; }
+
+    const response = await fetch("/quiz_answer", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({answer:selected.value, correct_answer:currentCorrectAnswer, username:"guest"})
+    });
+    const result = await response.json();
+    alert(result.message);
+
+    // Add a random badge if the answer is correct
+    let badges = result.badges || "";
+    if (result.message.toLowerCase().includes("correct")) {
+        const randomBadge = badgeEmojis[Math.floor(Math.random() * badgeEmojis.length)];
+        badges = badges ? badges + "," + randomBadge : randomBadge;
+        result.badges = badges;
+    }
+
+    updateUserStats(result.points, result.stickers, badges);
+}
+</script>
+</body>
+</html>
